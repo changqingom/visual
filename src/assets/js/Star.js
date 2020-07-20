@@ -135,7 +135,6 @@ class svgRenderer {
 
     this._svg;
     this._polyline;
-    this._initSVG();
   }
   _initSVG() {
     this._svg = SVG()
@@ -161,6 +160,9 @@ class svgRenderer {
     });
   }
   render(time = 0) {
+    if (!this._svg || !this._polyline) {
+      this._initSVG();
+    }
     if (time !== 0) {
       this._star._rotateDegress =
         360 * ((time - this._time) / this._star._duration);
