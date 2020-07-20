@@ -9,7 +9,7 @@ export class DragImg {
     this._rotateDegress = 0;
 
     this._initElement(element);
-    
+
     this._loadImage().then(this._drawImage.bind(this));
   }
   _initElement(element) {
@@ -53,7 +53,7 @@ export class DragImg {
       this._ctx.translate(-this._rotateOrigin[0], -this._rotateOrigin[1]);
 
       this._ctx.clearRect(0, 0, this._element.width, this._element.height);
-
+      
       this._ctx.drawImage(
         this._bitMap,
         this._centerCoordinate[0] - (this._bitMap.width * this._resolution) / 2,
