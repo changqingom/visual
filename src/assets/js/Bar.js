@@ -1,203 +1,257 @@
 const glMatrix = require("./gl-matrix-min");
 
-const numberArray = [2, 3, null, 4, 0, 5, 1, 4, 6, 3];
-const gridWidth = 20;
-window.glMatrix = glMatrix;
-function webGLStart() {
-  webGLInit();
-  tick();
-}
+export class Bar3d {
+  constructor(config) {
+    this._rotateX = config.rotate.x;
+    this._rotateY = config.rotate.y;
 
-let glProgram, gl, canvas, barInfo;
-computeBarInfo(numberArray);
-webGLStart();
+    this._barColor = [
+      parseInt(config.color.charAt(1) + config.color.charAt(2), 16) / 255,
+      parseInt(config.color.charAt(3) + config.color.charAt(4), 16) / 255,
+      parseInt(config.color.charAt(5) + config.color.charAt(6), 16) / 255,
+    ];
 
-function webGLInit() {
-  canvas = document.getElementById("canvas-bar");
+    this._gridWidth = 20;
+    this._initWebGL(config.element);
+  }
+  _initWebGL(element) {
+    if (!(element instanceof HTMLCanvasElement)) {
+      element = document.getElementById(element);
+    }
 
-  gl = canvas.getContext("webgl");
+    this._element = element;
+    const gl = (this._gl = this._element.getContext("webgl"));
+    this._resize({
+      height: this._element.offsetHeight,
+      width: this._element.offsetWidth,
+    });
 
-  canvas.height = canvas.clientHeight;
-  canvas.width = canvas.clientWidth;
-  gl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight);
+    gl.viewport(0, 0, this._element.clientWidth, this._element.clientHeight);
 
-  const vertexShaderScript = `
-  attribute vec4 a_position;
-  
-  uniform mat4 u_matrix;
-  void main() {
-    gl_Position = u_matrix * a_position;
+    const vertexShaderScript = `
+    attribute vec4 a_position;
     
-  }
-`;
-  const fragmentShaderScript = `
-  precision mediump float;
-
-  uniform vec4 u_color;
+    uniform mat4 u_matrix;
+    void main() {
+      gl_Position = u_matrix * a_position;
+      
+    }
+  `;
+    const fragmentShaderScript = `
+    precision mediump float;
   
-  void main() {
-     gl_FragColor = u_color;
+    uniform vec4 u_color;
+    
+    void main() {
+       gl_FragColor = u_color;
+    }
+  `;
+
+    const vertexShaderObj = gl.createShader(gl.VERTEX_SHADER);
+    const fragmentShaderObj = gl.createShader(gl.FRAGMENT_SHADER);
+
+    gl.shaderSource(vertexShaderObj, vertexShaderScript);
+    gl.shaderSource(fragmentShaderObj, fragmentShaderScript);
+
+    gl.compileShader(vertexShaderObj);
+    gl.compileShader(fragmentShaderObj);
+
+    if (!gl.getShaderParameter(vertexShaderObj, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(vertexShaderObj));
+    }
+    if (!gl.getShaderParameter(fragmentShaderObj, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(fragmentShaderObj));
+    }
+
+    this._glProgram = gl.createProgram();
+
+    gl.attachShader(this._glProgram, vertexShaderObj);
+    gl.attachShader(this._glProgram, fragmentShaderObj);
+
+    gl.linkProgram(this._glProgram);
+
+    gl.useProgram(this._glProgram);
   }
-`;
-
-  const vertexShaderObj = gl.createShader(gl.VERTEX_SHADER);
-  const fragmentShaderObj = gl.createShader(gl.FRAGMENT_SHADER);
-
-  gl.shaderSource(vertexShaderObj, vertexShaderScript);
-  gl.shaderSource(fragmentShaderObj, fragmentShaderScript);
-
-  gl.compileShader(vertexShaderObj);
-  gl.compileShader(fragmentShaderObj);
-
-  if (!gl.getShaderParameter(vertexShaderObj, gl.COMPILE_STATUS)) {
-    console.error(gl.getShaderInfoLog(vertexShaderObj));
+  _resize({ width, height }) {
+    this._element.height = height;
+    this._element.width = width;
   }
-  if (!gl.getShaderParameter(fragmentShaderObj, gl.COMPILE_STATUS)) {
-    console.error(gl.getShaderInfoLog(fragmentShaderObj));
+  _tick() {
+    this._renderScene();
+    requestAnimationFrame(this._tick.bind(this));
   }
+  _renderScene() {
+    const gl = this._gl;
+    gl.clearColor(1, 1, 1, 1);
 
-  glProgram = gl.createProgram();
+    gl.clear(gl.COLOR_BUFFER_BIT);
 
-  gl.attachShader(glProgram, vertexShaderObj);
-  gl.attachShader(glProgram, fragmentShaderObj);
+    gl.enable(gl.DEPTH_TEST);
 
-  gl.linkProgram(glProgram);
+    let matrixIndex = gl.getUniformLocation(this._glProgram, "u_matrix");
 
-  gl.useProgram(glProgram);
-}
-function renderScene() {
-  gl.clearColor(1, 1, 1, 1);
-
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
-  gl.enable(gl.DEPTH_TEST);
-
-  let matrixIndex = gl.getUniformLocation(glProgram, "u_matrix");
-
-  let mart4 = glMatrix.mat4.ortho(
-    glMatrix.mat4.create(),
-    -canvas.width / 2,
-    canvas.width / 2,
-    -canvas.height / 2,
-    canvas.height / 2,
-    -1000,
-    10000
-  );
-  mart4 = glMatrix.mat4.scale(
-    glMatrix.mat4.create(),
-    mart4,
-    glMatrix.vec3.fromValues(2.7, 2.5, 2)
-  );
-  mart4 = glMatrix.mat4.rotate(
-    glMatrix.mat4.create(),
-    mart4,
-    (15 * Math.PI) / 180,
-    glMatrix.vec3.fromValues(1, 0, 0)
-  );
-  mart4 = glMatrix.mat4.rotate(
-    glMatrix.mat4.create(),
-    mart4,
-    -(30 * Math.PI) / 180,
-    glMatrix.vec3.fromValues(0, 1, 0)
-  );
-
-  gl.uniformMatrix4fv(matrixIndex, false, mart4);
-
-  gl.useProgram(glProgram);
-
-  renderGrid();
-  renderBar();
-}
-
-function tick() {
-  renderScene();
-  // requestAnimationFrame(tick);
-}
-function renderGrid() {
-  const vertexArray = computeGrid(barInfo.xNumber, barInfo.yNumber);
-
-  for (const lineArray of vertexArray) {
-    const uniformColorIndex = gl.getUniformLocation(glProgram, "u_color");
-
-    gl.uniform4f(uniformColorIndex, 0, 0, 0, 0.2);
-
-    const positionBuffer = gl.createBuffer();
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lineArray), gl.STATIC_DRAW);
-
-    const attributePositionIndex = gl.getAttribLocation(
-      glProgram,
-      "a_position"
+    let mart4 = glMatrix.mat4.ortho(
+      glMatrix.mat4.create(),
+      -this._element.width / 2,
+      this._element.width / 2,
+      -this._element.height / 2,
+      this._element.height / 2,
+      -1000,
+      10000
+    );
+    mart4 = glMatrix.mat4.scale(
+      glMatrix.mat4.create(),
+      mart4,
+      glMatrix.vec3.fromValues(2.7, 2.5, 2)
+    );
+    mart4 = glMatrix.mat4.rotate(
+      glMatrix.mat4.create(),
+      mart4,
+      (this._rotateX * Math.PI) / 180,
+      glMatrix.vec3.fromValues(1, 0, 0)
+    );
+    mart4 = glMatrix.mat4.rotate(
+      glMatrix.mat4.create(),
+      mart4,
+      -(this._rotateX * Math.PI) / 180,
+      glMatrix.vec3.fromValues(0, 1, 0)
     );
 
-    gl.enableVertexAttribArray(attributePositionIndex);
+    gl.uniformMatrix4fv(matrixIndex, false, mart4);
 
-    gl.vertexAttribPointer(
-      attributePositionIndex,
-      3,
-      gl.FLOAT,
-      false,
-      (32 / 8) * 3,
-      0
-    );
+    gl.useProgram(this._glProgram);
 
-    gl.drawArrays(gl.LINE_STRIP, 0, 3);
+    this._renderGrid();
+    this._renderBar();
   }
-}
-function renderBar() {
-  for (let index = 0; index < numberArray.length; index++) {
-    const number = numberArray[index];
-    const { vertexArray, indexArray } = computeBarVertexArray(number, [
-      10 + 20 * index,
-      0,
-      17.5,
-    ]);
-
-    const uniformColorIndex = gl.getUniformLocation(glProgram, "u_color");
-
-    gl.uniform4f(uniformColorIndex, 1, 0, 0, 0.5);
-
-    const positionBuffer = gl.createBuffer();
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array(vertexArray),
-      gl.STATIC_DRAW
+  _renderGrid() {
+    const gl = this._gl;
+    const vertexArray = computeGrid.call(
+      this,
+      this._barInfo.xNumber,
+      this._barInfo.yNumber,
+      this._gridWidth
     );
 
-    const indexBuffer = gl.createBuffer();
+    for (const lineArray of vertexArray) {
+      const uniformColorIndex = gl.getUniformLocation(
+        this._glProgram,
+        "u_color"
+      );
 
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      gl.uniform4f(uniformColorIndex, 0, 0, 0, 0.2);
 
-    gl.bufferData(
-      gl.ELEMENT_ARRAY_BUFFER,
-      new Uint16Array(indexArray),
-      gl.STATIC_DRAW
-    );
+      const positionBuffer = gl.createBuffer();
 
-    const attributePositionIndex = gl.getAttribLocation(
-      glProgram,
-      "a_position"
-    );
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
-    gl.enableVertexAttribArray(attributePositionIndex);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(lineArray),
+        gl.STATIC_DRAW
+      );
 
-    gl.vertexAttribPointer(
-      attributePositionIndex,
-      3,
-      gl.FLOAT,
-      false,
-      (32 / 8) * 3,
-      0
-    );
+      const attributePositionIndex = gl.getAttribLocation(
+        this._glProgram,
+        "a_position"
+      );
 
-    gl.drawElements(gl.TRIANGLE_STRIP, indexArray.length, gl.UNSIGNED_SHORT, 0);
+      gl.enableVertexAttribArray(attributePositionIndex);
+
+      gl.vertexAttribPointer(
+        attributePositionIndex,
+        3,
+        gl.FLOAT,
+        false,
+        (32 / 8) * 3,
+        0
+      );
+
+      gl.drawArrays(gl.LINE_STRIP, 0, 3);
+    }
   }
-  return;
+  _renderBar() {
+    const gl = this._gl;
+    for (let index = 0; index < this._barInfo.count; index++) {
+      const number = this._barInfo.data[index];
+      const { vertexArray, indexArray } = computeBarVertexArray.call(
+        this,
+        number,
+        [10 + 20 * index, 0, 17.5],
+        10,
+        10,
+        this._gridWidth,
+        this._barInfo.xNumber,
+        this._barInfo.yNumber
+      );
+
+      const uniformColorIndex = gl.getUniformLocation(
+        this._glProgram,
+        "u_color"
+      );
+
+      gl.uniform4f(
+        uniformColorIndex,
+        this._barColor[0],
+        this._barColor[1],
+        this._barColor[2],
+        1
+      );
+
+      const positionBuffer = gl.createBuffer();
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(vertexArray),
+        gl.STATIC_DRAW
+      );
+
+      const indexBuffer = gl.createBuffer();
+
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+      gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(indexArray),
+        gl.STATIC_DRAW
+      );
+
+      const attributePositionIndex = gl.getAttribLocation(
+        this._glProgram,
+        "a_position"
+      );
+
+      gl.enableVertexAttribArray(attributePositionIndex);
+
+      gl.vertexAttribPointer(
+        attributePositionIndex,
+        3,
+        gl.FLOAT,
+        false,
+        (32 / 8) * 3,
+        0
+      );
+
+      gl.drawElements(
+        gl.TRIANGLE_STRIP,
+        indexArray.length,
+        gl.UNSIGNED_SHORT,
+        0
+      );
+    }
+  }
+  setData(data) {
+    const xNumber = data.length || 1;
+    const yNumber =
+      (data.reduce((val, pre) => {
+        return pre > val ? pre : val;
+      }, null) || 0) + 1;
+
+    this._barInfo = { xNumber, yNumber, count: data.length, data: data };
+    this._tick();
+  }
 }
 
 function computeBarVertexArray(
@@ -205,55 +259,56 @@ function computeBarVertexArray(
   centerCoordinate,
   length = 10,
   width = 10,
-  perHeight = gridWidth
+  perHeight,
+  xNumber,
+  yNumber
 ) {
   const vertexArray = [];
   const indexArray = [];
-  const { xNumber, yNumber } = barInfo;
   if (Number.isInteger(number)) {
     const [x, y, z] = centerCoordinate;
     //底
     vertexArray.push(
-      x - width / 2 - (xNumber * gridWidth) / 2,
-      y - (yNumber * gridWidth) / 2,
+      x - width / 2 - (xNumber * this._gridWidth) / 2,
+      y - (yNumber * this._gridWidth) / 2,
       z - length / 2
     );
     vertexArray.push(
-      x + width / 2 - (xNumber * gridWidth) / 2,
-      y - (yNumber * gridWidth) / 2,
+      x + width / 2 - (xNumber * this._gridWidth) / 2,
+      y - (yNumber * this._gridWidth) / 2,
       z - length / 2
     );
     vertexArray.push(
-      x + width / 2 - (xNumber * gridWidth) / 2,
-      y - (yNumber * gridWidth) / 2,
+      x + width / 2 - (xNumber * this._gridWidth) / 2,
+      y - (yNumber * this._gridWidth) / 2,
       z + length / 2
     );
     vertexArray.push(
-      x - width / 2 - (xNumber * gridWidth) / 2,
-      y - (yNumber * gridWidth) / 2,
+      x - width / 2 - (xNumber * this._gridWidth) / 2,
+      y - (yNumber * this._gridWidth) / 2,
       z + length / 2
     );
 
     if (number !== 0) {
       //顶
       vertexArray.push(
-        x - width / 2 - (xNumber * gridWidth) / 2,
-        perHeight * number - (yNumber * gridWidth) / 2,
+        x - width / 2 - (xNumber * this._gridWidth) / 2,
+        perHeight * number - (yNumber * this._gridWidth) / 2,
         z - length / 2
       );
       vertexArray.push(
-        x + width / 2 - (xNumber * gridWidth) / 2,
-        perHeight * number - (yNumber * gridWidth) / 2,
+        x + width / 2 - (xNumber * this._gridWidth) / 2,
+        perHeight * number - (yNumber * this._gridWidth) / 2,
         z - length / 2
       );
       vertexArray.push(
-        x + width / 2 - (xNumber * gridWidth) / 2,
-        perHeight * number - (yNumber * gridWidth) / 2,
+        x + width / 2 - (xNumber * this._gridWidth) / 2,
+        perHeight * number - (yNumber * this._gridWidth) / 2,
         z + length / 2
       );
       vertexArray.push(
-        x - width / 2 - (xNumber * gridWidth) / 2,
-        perHeight * number - (yNumber * gridWidth) / 2,
+        x - width / 2 - (xNumber * this._gridWidth) / 2,
+        perHeight * number - (yNumber * this._gridWidth) / 2,
         z + length / 2
       );
 
@@ -273,7 +328,7 @@ function computeBarVertexArray(
   return { vertexArray, indexArray };
 }
 
-function computeGrid(xNumber, yNumber, width = gridWidth) {
+function computeGrid(xNumber, yNumber, width) {
   const vertexArray = [];
   for (let index = 0; index <= yNumber; index++) {
     const temArray = [];
@@ -314,14 +369,4 @@ function computeGrid(xNumber, yNumber, width = gridWidth) {
     vertexArray.push(temArray);
   }
   return vertexArray;
-}
-
-function computeBarInfo(array) {
-  const xNumber = array.length || 1;
-  const yNumber =
-    (array.reduce((val, pre) => {
-      return pre > val ? pre : val;
-    }, null) || 0) + 1;
-
-  barInfo = { xNumber, yNumber };
 }

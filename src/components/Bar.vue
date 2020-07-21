@@ -5,23 +5,28 @@
 </template>
 
 <script>
-// import "../assets/js/Bar";
+import { Bar3d } from "../assets/js/Bar";
 
 export default {
   name: "Star",
   data() {
     return {
-      canvasPlayStar: undefined,
-      svgPlayStar: undefined
+      bar3d: undefined
     };
   },
   mounted() {
-    import("../assets/js/Bar");
+    this.init();
   },
   methods: {
-    init() {},
-    start() {},
-    stop() {}
+    init() {
+      this.bar3d = new Bar3d({
+        rotate: { x: 15, y: 30 },
+        color: "#7cb5ec",
+        element: this.$refs.canvas
+      });
+      const data = [2, 3, null, 4, 0, 5, 1, 4, 6, 3];
+      this.bar3d.setData(data);
+    }
   }
 };
 </script>
