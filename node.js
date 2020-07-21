@@ -1,4 +1,5 @@
 //node v12.18
+//题目四
 const fs = require("fs");
 const path = require("path");
 
@@ -14,7 +15,6 @@ let obj = {
 
 async function buildTreeObj(dirPath, temObj) {
   const dir = await fs.promises.opendir(dirPath);
-  console.log(dir.path);
   let temArray = dirPath.split(path.sep);
   temObj.text = temArray[temArray.length - 1];
   for await (const dirent of dir) {
